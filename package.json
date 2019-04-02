@@ -1,0 +1,28 @@
+{
+  "name": "esac-album-uploader",
+  "version": "1.0.0",
+  "description": "Simple utility to upload all existing photo albums to the new esac.nl album storage",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/esac-ic/album-uploader.git"
+  },
+  "author": "Marijn",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/esac-ic/album-uploader/issues"
+  },
+  "homepage": "https://github.com/esac-ic/album-uploader#readme",
+  "dependencies": {
+    "chalk": "^2.4.2",
+    "figlet": "^1.2.1",
+    "fs": "0.0.1-security",
+    "inquirer": "^6.2.2",
+    "path": "^0.12.7",
+    "request": "^2.88.0",
+    "sharp": "^0.22.0"
+  }
+}
