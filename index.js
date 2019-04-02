@@ -5,8 +5,9 @@ const chalk = require("chalk");
 const figlet = require("figlet");
 const path = require("path");
 const fs = require("fs");
-const uploader = require("./uploader");
+const Uploader = require("./uploader");
 
+// Fancy introduction message :)
 const intro = () => {
     console.log(
         chalk.green(
@@ -30,7 +31,12 @@ const askQuestions = () => {
             name: "URL",
             type: "input",
             message: "What is the base URL of the photoalbums API endpoint?",
-            default: "https://esac.nl/photoalbums"
+            default: "https://esac.nl/api/photoalbums"
+        },
+        {
+            name: "API_KEY",
+            type: "input",
+            message: "What is the API_KEY to authenticate with the API, as configured in the .env?",
         }
     ];
     return inquirer.prompt(questions);
@@ -44,11 +50,13 @@ const run = async () => {
 
     // ask questions
     const answers = await askQuestions();
-    const { BASEFOLDER, URL } = answers;
+    const { BASEFOLDER, URL, API_KEY } = answers;
+
+    let uploader = new Uploader(URL, API_KEY);
 
     fs.readdir(BASEFOLDER, (err, files) => {
         files.forEach(file => {
-            uploader.uploadAlbum(URL, path.join(BASEFOLDER, file));
+            uploader.uploadAlbum(path.join(BASEFOLDER, file));
         });
     });
 

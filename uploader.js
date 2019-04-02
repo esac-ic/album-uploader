@@ -4,42 +4,59 @@ const chalk = require("chalk");
 const sharp = require("sharp");
 const request = require("request");
 
-module.exports = {
-    uploadAlbum: function(url, folder) {
+let _url;
+let _apiKey;
+
+module.exports = class Uploader {
+    constructor(url, apiKey) {
+        _url = url;
+        _apiKey = apiKey;
+    }
+
+    uploadAlbum (folder) {
         let info = JSON.parse(fs.readFileSync(path.join(folder, "info.json"), 'utf8'));
 
+        // Give warning if name truncated.
         if (info.name.length >= 250) {
             info.name = info.name.substring(0, 250);
-            console.warn(chalk.yellow("Warning album name longer than 250 characters: " + info.name + "..."));
+            console.warn(chalk.yellow("Warning album name truncated, longer than 250 characters: " + info.name + "..."));
         }
 
+        // Give warning if description truncated.
         if (info.description.length >= 250) {
             info.description = info.description.substring(0, 250);
-            console.warn(chalk.yellow("Warning album name longer than 250 characters: " + info.description + "..."));
+            console.warn(chalk.yellow("Warning album description truncated, longer than 250 characters: " + info.description + "..."));
         }
 
         fs.readdir(folder, (err, files) => {
+            // Detect all folders in the base folder.
             files = files.filter(file => {
+                // Filter out the info.json file.
                 return file !== "info.json";
             }).map(file => {
-                return fs.readFileSync(path.join(folder, file));
+                // For each filename, read the image data.
+                return {
+                    value: fs.readFileSync(path.join(folder, file)),
+                    filename: file,
+                };
             });
 
-            processPhotos(url, files, info);
+            processPhotos(files, info);
         });
     }
 };
 
-function processPhotos(url, files, info){
+// TODO upload all in one api request, if post size allows.
+function processPhotos(files, info){
     let first = files.shift();
 
     resizeThumbnail(first).then(firstThumbnail => {
         downscalePhoto(first).then(firstPhoto => {
-            addAlbum(url, firstThumbnail, firstPhoto, info).then(albumId => {
+            addAlbum(firstThumbnail, firstPhoto, info).then(albumId => {
                 files.forEach(file => {
                     resizeThumbnail(file).then(thumbnail => {
                         downscalePhoto(file).then(photo => {
-                            addPhotoToAlbum(url, albumId, thumbnail, photo);
+                            addPhotoToAlbum(albumId, thumbnail, photo);
                         })
                     })
                 });
@@ -49,23 +66,53 @@ function processPhotos(url, files, info){
 }
 
 
-//Downscales the original photo to a smaller size
-//file: Photo to downscale
+/**
+ * Convert the image to JPEG and apply some compression.
+ * @param file Object, with in property {@code file.value } the file to compress, and in property {@code file.filename}
+ * the filename.
+ * @returns {Promise<Object>} image with options, as required by FormData.
+ */
 function downscalePhoto(file) {
-    return sharp(file)
-        .jpeg({
-            quality: 50,
-        })
-        .toBuffer();
+    return new Promise((resolve, reject) => {
+        sharp(file.value)
+            .jpeg({
+                quality: 50,
+            })
+            .toBuffer()
+            .then(data => {
+                resolve({
+                    value: data,
+                    options: {
+                        filename: file.filename,
+                        contentType: 'image/jpeg'
+                    }
+                });
+            });
+    });
 }
 
-//Resizes the original photo to a thumbnail
-//file: Photo to resize
+/**
+ * Crop the image and convert it to JPEG.
+ * @param file Object, with in property {@code file.value } the file to compress, and in property {@code file.filename}
+ * the filename.
+ * @returns {Promise<Object>} image with options, as required by FormData.
+ */
 function resizeThumbnail(file) {
-    return sharp(file)
-        .resize(354, 354)
-        .jpeg()
-        .toBuffer();
+    return new Promise((resolve, reject) => {
+        sharp(file.value)
+            .resize(354, 354)
+            .jpeg()
+            .toBuffer()
+            .then(data => {
+                resolve({
+                    value: data,
+                    options: {
+                    filename: file.filename,
+                        contentType: 'image/jpeg'
+                }
+                });
+            });
+    });
 }
 
 //Api Post request to backend to add one album.
@@ -75,24 +122,18 @@ function resizeThumbnail(file) {
 //albumdescription: description of album that will be created
 //captureDate: Capture date of the photos
 //fileIndex: fileIndex of current photo (This is given to ensure to reload after last photo)
-function addAlbum(url, thumbnail, photo, info) {
+function addAlbum(thumbnail, photo, info) {
     // TODO use api endpoint instead, with new auth.
     return new Promise(function (resolve, reject) {
         const formData = {
             title: info.name,
             description: info.description,
             captureDate: info.date,
-            thumnails: [thumbnail],
-            photos: [photo],
-            /*custom_file: {
-                value:  fs.createReadStream('/dev/urandom'),
-                options: {
-                    filename: 'topsecret.jpg',
-                    contentType: 'image/jpeg'
-                }
-            }*/
+            "thumbnails[]": thumbnail,
+            "photos[]": photo,
+            api_token: _apiKey,
         };
-        request.post({url: url, formData: formData, headers: {
+        request.post({url: _url, formData: formData, headers: {
             'Accept': 'application/json'
             }}, function onResponse(err, httpResponse, body) {
             console.log(body);
@@ -109,29 +150,25 @@ function addAlbum(url, thumbnail, photo, info) {
 //thumbnail: thumbnail of photo that will be uploaded
 //photo: photo that will be uploaded
 //fileIndex: fileIndex of current photo (This is given to ensure to reload after last photo)
-function addPhotoToAlbum(url, albumId, thumbnail, photo){
-    // TODO replace ajax.
+function addPhotoToAlbum(albumId, thumbnail, photo){
     return new Promise(function (resolve, reject) {
-        var formData = new FormData();
-        formData.append('thumbnails[]',thumbnail);
-        formData.append('photos[]', photo);
+        const formData = {
+            "thumbnails[]": thumbnail,
+            "photos[]": photo,
+            api_token: _apiKey,
+        };
 
-        var type = "POST";
-        formData.append("_token", window.Laravel.csrfToken);
+        const url = _url + "/" + albumId;
 
-        $.ajax({
-            url: url + "/" + albumId,
-            data: formData,
-            type: type,
-            contentType: false,
-            processData: false,
-            success: function (result) {
-                resolve();
-            },
-            error: function (request, error) {
-                console.log(arguments);
-                alert(" Can't do because: " + error);
+        request.post({url: url, formData: formData, headers: {
+                'Accept': 'application/json'
+            }}, function onResponse(err, httpResponse, body) {
+            console.log(body);
+            if (err) {
+                // TODO
+                return console.error('upload failed:', err);
             }
+            resolve();
         });
     });
 }
