@@ -11,4 +11,15 @@ Also make sure the [feature/photoalbums_api](https://github.com/esac-ic/esac.nl/
 * npm install
 
 ## Run instructions
-* node index.js
+Make sure each album folder contains only images and one `info.json` file, structed as follows: 
+
+```json
+{
+    "name": "Album name",
+    "description": "Nice description",
+    "date": "YYYY-MM-DD"
+}
+
+```
+
+Then run `node index.js`
