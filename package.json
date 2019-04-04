@@ -18,6 +18,7 @@
   "homepage": "https://github.com/esac-ic/album-uploader#readme",
   "dependencies": {
     "chalk": "^2.4.2",
+    "draftlog": "^1.0.12",
     "figlet": "^1.2.1",
     "fs": "0.0.1-security",
     "inquirer": "^6.2.2",

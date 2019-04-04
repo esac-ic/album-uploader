@@ -6,6 +6,7 @@ const figlet = require("figlet");
 const path = require("path");
 const fs = require("fs");
 const Uploader = require("./uploader");
+const Draftlog = require("draftlog").into(console);
 
 // Fancy introduction message :)
 const intro = () => {
@@ -37,6 +38,12 @@ const askQuestions = () => {
             name: "API_KEY",
             type: "input",
             message: "What is the API_KEY to authenticate with the API, as configured in the .env?",
+        },
+        {
+            name: "BATCH_SIZE",
+            type: "number",
+            message: "What is the maximum batch size for the API requests, i.e. what is PHP's max post size? (in MB)",
+            default: 50
         }
     ];
     return inquirer.prompt(questions);
@@ -50,17 +57,21 @@ const run = async () => {
 
     // ask questions
     const answers = await askQuestions();
-    const { BASEFOLDER, URL, API_KEY } = answers;
+    const { BASEFOLDER, URL, API_KEY, BATCH_SIZE } = answers;
 
-    let uploader = new Uploader(URL, API_KEY);
+    let uploader = new Uploader(URL, API_KEY, BATCH_SIZE);
 
     fs.readdir(BASEFOLDER, (err, files) => {
+        if (!files) {
+            console.log(chalk.white.bgRed.bold("Base folder does not exist."));
+            return;
+        }
+
         files.forEach(file => {
-            uploader.uploadAlbum(path.join(BASEFOLDER, file));
+            let progress = console.draft('Starting conversion...');
+            uploader.uploadAlbum(progress, path.join(BASEFOLDER, file));
         });
     });
-
-    // show success message
 };
 
 run();
