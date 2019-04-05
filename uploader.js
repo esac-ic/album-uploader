@@ -74,7 +74,7 @@ function divideInBatches(thumbnails, photos) {
 
         if (batches.length === 0 || size + combiSize > _batchSize || amount + 2 > MAX_FILES) {
             size = combiSize;
-            amount = 1;
+            amount = 2;
             batches.push({
                 thumbnails: [thumbnail],
                 photos: [photo],
